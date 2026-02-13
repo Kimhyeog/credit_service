@@ -1,0 +1,84 @@
+generator client {
+  provider             = "prisma-client-py"
+  recursive_type_depth = 5
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+
+model Menu {
+  id          String   @id @default(cuid())
+  name        String
+  price       Int                // 원 단위 (정수로 관리 → 부동소수점 오류 방지)
+  category    String
+  imageUrl    String?
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orderItems  OrderItem[]
+}
+
+model Order {
+  id              String   @id @default(cuid())
+  orderNumber     Int      @unique            // 코드에서 채번 (SQLite는 non-id autoincrement 미지원)
+  status          String   @default("PENDING") // PENDING, PAYMENT_PENDING, PAID, CANCELLED, REFUNDED, FAILED
+  totalAmount     Int
+  idempotencyKey  String   @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items           OrderItem[]
+  payment         Payment?
+}
+
+model OrderItem {
+  id       String @id @default(cuid())
+  quantity Int
+  price    Int                  // ← 주문 시점 가격 스냅샷
+
+  orderId  String
+  order    Order  @relation(fields: [orderId], references: [id])
+  menuId   String
+  menu     Menu   @relation(fields: [menuId], references: [id])
+}
+
+model Payment {
+  id              String    @id @default(cuid())
+  paymentKey      String?   @unique              // Toss에서 발급하는 고유 키
+  method          String?                         // CARD, CASH 등
+  status          String    @default("READY")     // READY, IN_PROGRESS, DONE, CANCELED, PARTIAL_CANCELED, ABORTED, EXPIRED
+  amount          Int
+  approvedAt      DateTime?
+  failReason      String?
+  rawResponse     String?                         // Toss 응답 전체 JSON (디버깅용)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  orderId         String    @unique               // 1:1 관계
+  order           Order     @relation(fields: [orderId], references: [id])
+}
+
+model IdempotencyRecord {
+  id             String   @id @default(cuid())
+  idempotencyKey String   @unique
+  httpMethod     String
+  path           String
+  statusCode     Int
+  responseBody   String
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime
+}
+
+model WebhookEvent {
+  id          String   @id @default(cuid())
+  eventType   String
+  paymentKey  String
+  payload     String
+  processed   Boolean  @default(false)
+  processedAt DateTime?
+  createdAt   DateTime @default(now())
+}
