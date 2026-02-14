@@ -17,12 +17,11 @@ async def main():
     db = Prisma()
     await db.connect()
 
-    # 외래 키 순서: Payment → OrderItem → Order → Menu
-    await db.payment.delete_many()
-    await db.orderitem.delete_many()
-    await db.order.delete_many()
-    deleted = await db.menu.delete_many()
-    print(f"Cleared existing data (menus: {deleted}).")
+    existing = await db.menu.count()
+    if existing > 0:
+        print(f"이미 {existing}개 메뉴 존재 — 시드 건너뜀.")
+        await db.disconnect()
+        return
 
     for menu in SEED_MENUS:
         await db.menu.create(data=menu)

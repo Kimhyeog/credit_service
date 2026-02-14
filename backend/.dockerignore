@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+prisma/dev.db
+prisma/test.db
+.env
