@@ -26,4 +26,5 @@ RUN python -m prisma generate
 
 EXPOSE 8000
 
-CMD prisma db push --skip-generate && python prisma/seed.py && uvicorn app.main:app --host 0.0.0.0 --port 8000
+# 시작 스크립트 (DB 연결 재시도 포함)
+CMD ["bash", "start.sh"]
