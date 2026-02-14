@@ -3,6 +3,8 @@
 import styled from "@emotion/styled";
 import { useCart } from "@/providers/CartProvider";
 import { useCreateOrder } from "@/hooks/useCreateOrder";
+import { createPaymentService } from "@/services/payment";
+import { generateIdempotencyKey } from "@/utils/idempotency";
 import CartItem from "./CartItem";
 import Button from "@/components/common/Button";
 import OrderModeToggle from "@/components/common/OrderModeToggle";
@@ -71,7 +73,9 @@ export default function Cart() {
   const handleOrder = () => {
     if (state.items.length === 0) return;
 
-    const idempotencyKey = `pos_temp_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const idempotencyKey = generateIdempotencyKey(
+      state.items.map((item) => ({ menuId: item.menu.id, quantity: item.quantity }))
+    );
 
     createOrder.mutate(
       {
@@ -83,8 +87,23 @@ export default function Cart() {
         order_mode: state.orderMode,
       },
       {
-        onSuccess: () => {
+        onSuccess: async (order) => {
+          const firstName = state.items[0]?.menu.name || "주문";
+          const orderName =
+            state.items.length > 1
+              ? `${firstName} 외 ${state.items.length - 1}건`
+              : firstName;
+
           dispatch({ type: "CLEAR" });
+
+          const paymentService = createPaymentService();
+          await paymentService.requestPayment({
+            orderId: order.id,
+            orderName,
+            amount: order.totalAmount,
+            successUrl: `/payment/success?returnTo=/`,
+            failUrl: `/payment/fail?returnTo=/`,
+          });
         },
       },
     );

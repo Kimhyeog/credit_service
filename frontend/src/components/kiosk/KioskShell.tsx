@@ -5,6 +5,8 @@ import styled from "@emotion/styled";
 import { useMenus } from "@/hooks/useMenus";
 import { useCart } from "@/providers/CartProvider";
 import { useCreateOrder } from "@/hooks/useCreateOrder";
+import { createPaymentService } from "@/services/payment";
+import { generateIdempotencyKey } from "@/utils/idempotency";
 import CategoryTabs from "@/components/common/CategoryTabs";
 import Button from "@/components/common/Button";
 import type { MenuItem } from "@/types/menu";
@@ -134,7 +136,9 @@ export default function KioskShell({ initialMenus }: KioskShellProps) {
   const handleOrder = () => {
     if (state.items.length === 0) return;
 
-    const idempotencyKey = `kiosk_temp_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const idempotencyKey = generateIdempotencyKey(
+      state.items.map((item) => ({ menuId: item.menu.id, quantity: item.quantity }))
+    );
 
     createOrder.mutate(
       {
@@ -146,8 +150,23 @@ export default function KioskShell({ initialMenus }: KioskShellProps) {
         order_mode: state.orderMode,
       },
       {
-        onSuccess: () => {
+        onSuccess: async (order) => {
+          const firstName = state.items[0]?.menu.name || "주문";
+          const orderName =
+            state.items.length > 1
+              ? `${firstName} 외 ${state.items.length - 1}건`
+              : firstName;
+
           dispatch({ type: "CLEAR" });
+
+          const paymentService = createPaymentService();
+          await paymentService.requestPayment({
+            orderId: order.id,
+            orderName,
+            amount: order.totalAmount,
+            successUrl: `/payment/success?returnTo=/kiosk`,
+            failUrl: `/payment/fail?returnTo=/kiosk`,
+          });
         },
       },
     );

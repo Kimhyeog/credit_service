@@ -16,6 +16,9 @@ class PaymentConfirmRequest(BaseModel):
     order_id: str
     amount: int
 
+class PaymentCancelRequest(BaseModel):
+    reason: str = "고객 요청 취소"
+
 # ─── 응답 스키마 ───
 
 class OrderResponse(BaseModel):

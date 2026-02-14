@@ -3,7 +3,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.client import db
 from app.config import settings
-from app.routers import menus, orders
+from app.routers import menus, orders, payments
+from app.middleware.idempotency import IdempotencyMiddleware
 
 
 @asynccontextmanager
@@ -23,9 +24,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 멱등성 미들웨어 — POST/PATCH 요청의 중복 처리 방지
+app.add_middleware(IdempotencyMiddleware)
+
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok"}
 
 app.include_router(menus.router)
 app.include_router(orders.router)
+app.include_router(payments.router)
