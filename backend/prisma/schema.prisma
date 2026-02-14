@@ -1,6 +1,8 @@
 generator client {
   provider             = "prisma-client-py"
   recursive_type_depth = 5
+  previewFeatures      = []
+  binaryTargets        = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
