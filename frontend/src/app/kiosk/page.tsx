@@ -1,11 +1,14 @@
-export default function KioskPage() {
-  return (
-    <div style={{ padding: "32px", textAlign: "center" }}>
-      <h1>키오스크</h1>
-      <p>Phase 5에서 구현 예정</p>
-      <a href="/" style={{ color: "#3182F6" }}>
-        ← POS로 돌아가기
-      </a>
-    </div>
-  );
+import { getMenus } from "@/lib/server-api";
+import KioskShell from "@/components/kiosk/KioskShell";
+import type { MenuItem } from "@/types/menu";
+
+export default async function KioskPage() {
+  let menus: MenuItem[];
+  try {
+    menus = await getMenus();
+  } catch {
+    menus = [];
+  }
+
+  return <KioskShell initialMenus={menus} />;
 }

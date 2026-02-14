@@ -1,0 +1,212 @@
+"use client";
+
+import { useState, useMemo } from "react";
+import styled from "@emotion/styled";
+import { useMenus } from "@/hooks/useMenus";
+import { useCart } from "@/providers/CartProvider";
+import { useCreateOrder } from "@/hooks/useCreateOrder";
+import CategoryTabs from "@/components/common/CategoryTabs";
+import Button from "@/components/common/Button";
+import type { MenuItem } from "@/types/menu";
+
+interface TableOrderShellProps {
+  tableId: string;
+  initialMenus: MenuItem[];
+}
+
+const Layout = styled.div`
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+  background: ${({ theme }) => theme.colors.background};
+`;
+
+const Header = styled.header`
+  padding: ${({ theme }) => theme.spacing.md};
+  text-align: center;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+`;
+
+const TableBadge = styled.div`
+  display: inline-block;
+  padding: ${({ theme }) => `${theme.spacing.xs} ${theme.spacing.md}`};
+  background: ${({ theme }) => theme.colors.primary};
+  color: white;
+  border-radius: ${({ theme }) => theme.borderRadius.sm};
+  font-size: ${({ theme }) => theme.fontSize.sm};
+  font-weight: 600;
+`;
+
+const Title = styled.h1`
+  font-size: ${({ theme }) => theme.fontSize.lg};
+  font-weight: 700;
+  color: ${({ theme }) => theme.colors.text.primary};
+  margin-top: ${({ theme }) => theme.spacing.sm};
+`;
+
+const MenuArea = styled.div`
+  flex: 1;
+  overflow-y: auto;
+  padding: ${({ theme }) => theme.spacing.sm};
+`;
+
+const MenuList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.sm};
+`;
+
+const MenuRow = styled.button`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.md};
+  padding: ${({ theme }) => theme.spacing.md};
+  background: ${({ theme }) => theme.colors.surface};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  width: 100%;
+  text-align: left;
+  transition: background-color 0.15s;
+
+  &:active {
+    background: ${({ theme }) => theme.colors.surfaceHover};
+  }
+`;
+
+const MenuInfo = styled.div`
+  flex: 1;
+`;
+
+const MenuName = styled.p`
+  font-size: ${({ theme }) => theme.fontSize.md};
+  font-weight: 600;
+  color: ${({ theme }) => theme.colors.text.primary};
+`;
+
+const MenuPrice = styled.p`
+  font-size: ${({ theme }) => theme.fontSize.sm};
+  color: ${({ theme }) => theme.colors.text.secondary};
+  margin-top: 2px;
+`;
+
+const AddBadge = styled.span`
+  font-size: ${({ theme }) => theme.fontSize.lg};
+  color: ${({ theme }) => theme.colors.primary};
+`;
+
+const BottomBar = styled.div`
+  padding: ${({ theme }) => theme.spacing.md};
+  border-top: 1px solid ${({ theme }) => theme.colors.border};
+`;
+
+const CartInfo = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: ${({ theme }) => theme.spacing.sm};
+`;
+
+const CartLabel = styled.span`
+  font-size: ${({ theme }) => theme.fontSize.sm};
+  color: ${({ theme }) => theme.colors.text.secondary};
+`;
+
+const CartAmount = styled.span`
+  font-size: ${({ theme }) => theme.fontSize.lg};
+  font-weight: 700;
+  color: ${({ theme }) => theme.colors.text.primary};
+`;
+
+export default function TableOrderShell({ tableId, initialMenus }: TableOrderShellProps) {
+  const { data: menus } = useMenus(initialMenus);
+
+  const { state, dispatch } = useCart();
+  const createOrder = useCreateOrder();
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+
+  const categories = useMemo(() => {
+    const cats = new Set((menus ?? []).map((m) => m.category));
+    return Array.from(cats);
+  }, [menus]);
+
+  const filteredMenus = useMemo(() => {
+    if (activeCategory === null) return menus ?? [];
+    return (menus ?? []).filter((m) => m.category === activeCategory);
+  }, [menus, activeCategory]);
+
+  const totalQuantity = state.items.reduce((sum, i) => sum + i.quantity, 0);
+
+  const handleMenuClick = (menu: MenuItem) => {
+    dispatch({ type: "ADD_ITEM", menu });
+  };
+
+  const handleOrder = () => {
+    if (state.items.length === 0) return;
+
+    const idempotencyKey = `table_${tableId}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+
+    createOrder.mutate(
+      {
+        items: state.items.map((item) => ({
+          menu_id: item.menu.id,
+          quantity: item.quantity,
+        })),
+        idempotency_key: idempotencyKey,
+        order_mode: "DINE_IN",
+      },
+      {
+        onSuccess: () => {
+          dispatch({ type: "CLEAR" });
+        },
+      },
+    );
+  };
+
+  return (
+    <Layout>
+      <Header>
+        <TableBadge>테이블 {tableId}</TableBadge>
+        <Title>메뉴를 선택해주세요</Title>
+      </Header>
+
+      <CategoryTabs
+        categories={categories}
+        activeCategory={activeCategory}
+        onSelect={setActiveCategory}
+      />
+
+      <MenuArea>
+        <MenuList>
+          {filteredMenus.map((menu) => (
+            <MenuRow key={menu.id} onClick={() => handleMenuClick(menu)}>
+              <MenuInfo>
+                <MenuName>{menu.name}</MenuName>
+                <MenuPrice>{menu.price.toLocaleString()}원</MenuPrice>
+              </MenuInfo>
+              <AddBadge>+</AddBadge>
+            </MenuRow>
+          ))}
+        </MenuList>
+      </MenuArea>
+
+      {totalQuantity > 0 && (
+        <BottomBar>
+          <CartInfo>
+            <CartLabel>{totalQuantity}개 선택</CartLabel>
+            <CartAmount>{state.totalAmount.toLocaleString()}원</CartAmount>
+          </CartInfo>
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            onClick={handleOrder}
+            disabled={createOrder.isPending}
+          >
+            {createOrder.isPending ? "주문 중..." : "주문하기"}
+          </Button>
+        </BottomBar>
+      )}
+    </Layout>
+  );
+}
