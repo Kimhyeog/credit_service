@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import styled from "@emotion/styled";
+import { forceReleaseLock } from "@/hooks/usePaymentLock";
 import Button from "@/components/common/Button";
 
 const Container = styled.div`
@@ -50,6 +52,11 @@ const ErrorMessage = styled.p`
 export default function PaymentFailPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  // 페이지 진입 시 결제 잠금 해제
+  useEffect(() => {
+    forceReleaseLock();
+  }, []);
 
   const code = searchParams.get("code") || "UNKNOWN_ERROR";
   const message = searchParams.get("message") || "결제 중 오류가 발생했습니다.";

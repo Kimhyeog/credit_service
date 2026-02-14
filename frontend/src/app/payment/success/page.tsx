@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import styled from "@emotion/styled";
 import { createPaymentService } from "@/services/payment";
 import type { PaymentResult } from "@/services/payment";
+import { WALManager } from "@/services/recovery/WALManager";
+import { forceReleaseLock } from "@/hooks/usePaymentLock";
 import Button from "@/components/common/Button";
 
 const Container = styled.div`
@@ -69,10 +71,14 @@ export default function PaymentSuccessPage() {
   const [status, setStatus] = useState<Status>("loading");
   const [result, setResult] = useState<PaymentResult | null>(null);
   const [error, setError] = useState<string>("");
+  const confirmedRef = useRef(false);
 
   const returnTo = searchParams.get("returnTo") || "/";
 
   useEffect(() => {
+    // 재진입 방지 — Strict Mode, searchParams 재평가 등에서 중복 호출 차단
+    if (confirmedRef.current) return;
+
     const paymentKey = searchParams.get("paymentKey");
     const orderId = searchParams.get("orderId");
     const amount = searchParams.get("amount");
@@ -80,8 +86,11 @@ export default function PaymentSuccessPage() {
     if (!paymentKey || !orderId || !amount) {
       setStatus("error");
       setError("결제 정보가 누락되었습니다.");
+      forceReleaseLock();
       return;
     }
+
+    confirmedRef.current = true;
 
     const paymentService = createPaymentService();
     paymentService
@@ -93,10 +102,19 @@ export default function PaymentSuccessPage() {
       .then((res) => {
         setResult(res);
         setStatus("success");
+
+        // WAL에서 해당 주문 정리
+        const wal = new WALManager();
+        const entries = wal.readAll().filter((e) => e.orderId === orderId);
+        entries.forEach((e) => wal.remove(e.id));
       })
       .catch((err) => {
+        confirmedRef.current = false; // 실패 시 새로고침으로 재시도 허용
         setError(err.detail || "결제 승인에 실패했습니다.");
         setStatus("error");
+      })
+      .finally(() => {
+        forceReleaseLock();
       });
   }, [searchParams]);
 

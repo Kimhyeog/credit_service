@@ -3,7 +3,7 @@
 import styled from "@emotion/styled";
 import { useCart } from "@/providers/CartProvider";
 import { useCreateOrder } from "@/hooks/useCreateOrder";
-import { createPaymentService } from "@/services/payment";
+import { usePayment } from "@/hooks/usePayment";
 import { generateIdempotencyKey } from "@/utils/idempotency";
 import CartItem from "./CartItem";
 import Button from "@/components/common/Button";
@@ -69,6 +69,9 @@ const SummaryAmount = styled.span`
 export default function Cart() {
   const { state, dispatch } = useCart();
   const createOrder = useCreateOrder();
+  const { state: paymentState, startPayment } = usePayment();
+
+  const isProcessing = createOrder.isPending || paymentState !== "IDLE";
 
   const handleOrder = () => {
     if (state.items.length === 0) return;
@@ -77,36 +80,36 @@ export default function Cart() {
       state.items.map((item) => ({ menuId: item.menu.id, quantity: item.quantity }))
     );
 
-    createOrder.mutate(
-      {
-        items: state.items.map((item) => ({
-          menu_id: item.menu.id,
-          quantity: item.quantity,
-        })),
-        idempotency_key: idempotencyKey,
-        order_mode: state.orderMode,
-      },
-      {
-        onSuccess: async (order) => {
-          const firstName = state.items[0]?.menu.name || "주문";
-          const orderName =
-            state.items.length > 1
-              ? `${firstName} 외 ${state.items.length - 1}건`
-              : firstName;
+    const firstName = state.items[0]?.menu.name || "주문";
+    const orderName =
+      state.items.length > 1
+        ? `${firstName} 외 ${state.items.length - 1}건`
+        : firstName;
 
-          dispatch({ type: "CLEAR" });
-
-          const paymentService = createPaymentService();
-          await paymentService.requestPayment({
-            orderId: order.id,
-            orderName,
-            amount: order.totalAmount,
-            successUrl: `/payment/success?returnTo=/`,
-            failUrl: `/payment/fail?returnTo=/`,
-          });
-        },
+    startPayment({
+      items: state.items.map((item) => ({
+        menuId: item.menu.id,
+        quantity: item.quantity,
+        name: item.menu.name,
+      })),
+      amount: state.totalAmount,
+      idempotencyKey,
+      orderName,
+      successUrl: "/payment/success?returnTo=/",
+      failUrl: "/payment/fail?returnTo=/",
+      onOrderCreate: async () => {
+        const order = await createOrder.mutateAsync({
+          items: state.items.map((item) => ({
+            menu_id: item.menu.id,
+            quantity: item.quantity,
+          })),
+          idempotency_key: idempotencyKey,
+          order_mode: state.orderMode,
+          source: "POS",
+        });
+        return order;
       },
-    );
+    });
   };
 
   const totalQuantity = state.items.reduce((sum, i) => sum + i.quantity, 0);
@@ -144,9 +147,9 @@ export default function Cart() {
           size="lg"
           fullWidth
           onClick={handleOrder}
-          disabled={state.items.length === 0 || createOrder.isPending}
+          disabled={state.items.length === 0 || isProcessing}
         >
-          {createOrder.isPending ? "주문 생성 중..." : "결제하기"}
+          {isProcessing ? "결제 진행 중..." : "결제하기"}
         </Button>
       </Footer>
     </Container>

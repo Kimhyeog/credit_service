@@ -30,7 +30,7 @@ function calcTotal(items: CartItem[]): number {
   return items.reduce((sum, i) => sum + i.menu.price * i.quantity, 0);
 }
 
-function cartReducer(state: CartState, action: CartAction): CartState {
+export function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case "ADD_ITEM": {
       const existing = state.items.find((i) => i.menu.id === action.menu.id);

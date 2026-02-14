@@ -25,9 +25,12 @@ model Menu {
 model Order {
   id              String   @id @default(cuid())
   orderNumber     Int      @unique            // 코드에서 채번 (SQLite는 non-id autoincrement 미지원)
-  status          String   @default("PENDING") // PENDING, PAYMENT_PENDING, PAID, CANCELLED, REFUNDED, FAILED
+  status          String   @default("PENDING") // PENDING, PAYMENT_PENDING, PAID, PREPARING, COMPLETED, CANCELLED, REFUNDED, FAILED
   totalAmount     Int
   idempotencyKey  String   @unique
+  source          String   @default("POS")    // POS, KIOSK, TABLE
+  orderMode       String   @default("DINE_IN") // DINE_IN, TAKE_OUT
+  tableId         String?                      // 테이블오더 전용
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

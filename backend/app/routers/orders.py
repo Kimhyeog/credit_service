@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Header, Query
 from app.db.client import get_db
-from app.models.schemas import OrderCreate
+from app.models.schemas import OrderCreate, OrderStatusUpdate
 from app.services.order_service import OrderService
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
@@ -16,6 +16,9 @@ async def create_order(
     order = await service.create_order(
         items=body.items,
         idempotency_key=body.idempotency_key,
+        source=body.source,
+        order_mode=body.order_mode,
+        table_id=body.table_id,
     )
     return order
 
@@ -32,6 +35,14 @@ async def get_order(order_id: str):
     db = get_db()
     service = OrderService(db)
     return await service.get_order(order_id)
+
+
+@router.patch("/{order_id}/status")
+async def update_order_status(order_id: str, body: OrderStatusUpdate):
+    """KDS 상태 전환: PAID → PREPARING → COMPLETED"""
+    db = get_db()
+    service = OrderService(db)
+    return await service.update_status(order_id, body.status)
 
 
 @router.patch("/{order_id}/cancel")

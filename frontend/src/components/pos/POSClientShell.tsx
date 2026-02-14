@@ -3,8 +3,11 @@
 import Link from "next/link";
 import styled from "@emotion/styled";
 import { useMenus } from "@/hooks/useMenus";
+import { useRecovery } from "@/hooks/useRecovery";
 import MenuGrid from "./MenuGrid";
 import Cart from "./Cart";
+import RecoveryBanner from "@/components/payment/RecoveryBanner";
+import OfflineBanner from "@/components/common/OfflineBanner";
 import ThemeToggle from "@/components/common/ThemeToggle";
 import type { MenuItem } from "@/types/menu";
 
@@ -69,10 +72,21 @@ const MenuArea = styled.div`
 
 export default function POSClientShell({ initialMenus }: POSClientShellProps) {
   const { data: menus } = useMenus(initialMenus);
+  const { isRecovering, recoveredCount, needsManualCount, dismiss } =
+    useRecovery();
 
   return (
     <PageLayout>
+      <OfflineBanner />
       <MenuSection>
+        {!isRecovering &&
+          (recoveredCount > 0 || needsManualCount > 0) && (
+            <RecoveryBanner
+              recoveredCount={recoveredCount}
+              needsManualCount={needsManualCount}
+              onDismiss={dismiss}
+            />
+          )}
         <TopBar>
           <Logo>Toss-Sync POS</Logo>
           <TopBarActions>

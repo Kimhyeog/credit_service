@@ -10,6 +10,12 @@ class OrderItemCreate(BaseModel):
 class OrderCreate(BaseModel):
     items: list[OrderItemCreate]
     idempotency_key: str = Field(min_length=16, max_length=64)
+    source: str = "POS"
+    order_mode: str = "DINE_IN"
+    table_id: str | None = None
+
+class OrderStatusUpdate(BaseModel):
+    status: str
 
 class PaymentConfirmRequest(BaseModel):
     payment_key: str
@@ -26,6 +32,9 @@ class OrderResponse(BaseModel):
     order_number: int
     status: str
     total_amount: int
+    source: str
+    order_mode: str
+    table_id: str | None
     items: list[dict]
     created_at: datetime
 

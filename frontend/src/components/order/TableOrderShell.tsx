@@ -5,10 +5,11 @@ import styled from "@emotion/styled";
 import { useMenus } from "@/hooks/useMenus";
 import { useCart } from "@/providers/CartProvider";
 import { useCreateOrder } from "@/hooks/useCreateOrder";
-import { createPaymentService } from "@/services/payment";
+import { usePayment } from "@/hooks/usePayment";
 import { generateIdempotencyKey } from "@/utils/idempotency";
 import CategoryTabs from "@/components/common/CategoryTabs";
 import Button from "@/components/common/Button";
+import OfflineBanner from "@/components/common/OfflineBanner";
 import type { MenuItem } from "@/types/menu";
 
 interface TableOrderShellProps {
@@ -125,7 +126,10 @@ export default function TableOrderShell({ tableId, initialMenus }: TableOrderShe
 
   const { state, dispatch } = useCart();
   const createOrder = useCreateOrder();
+  const { state: paymentState, startPayment } = usePayment();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+
+  const isProcessing = createOrder.isPending || paymentState !== "IDLE";
 
   const categories = useMemo(() => {
     const cats = new Set((menus ?? []).map((m) => m.category));
@@ -150,40 +154,42 @@ export default function TableOrderShell({ tableId, initialMenus }: TableOrderShe
       state.items.map((item) => ({ menuId: item.menu.id, quantity: item.quantity }))
     );
 
-    createOrder.mutate(
-      {
-        items: state.items.map((item) => ({
-          menu_id: item.menu.id,
-          quantity: item.quantity,
-        })),
-        idempotency_key: idempotencyKey,
-        order_mode: "DINE_IN",
-      },
-      {
-        onSuccess: async (order) => {
-          const firstName = state.items[0]?.menu.name || "주문";
-          const orderName =
-            state.items.length > 1
-              ? `${firstName} 외 ${state.items.length - 1}건`
-              : firstName;
+    const firstName = state.items[0]?.menu.name || "주문";
+    const orderName =
+      state.items.length > 1
+        ? `${firstName} 외 ${state.items.length - 1}건`
+        : firstName;
 
-          dispatch({ type: "CLEAR" });
-
-          const paymentService = createPaymentService();
-          await paymentService.requestPayment({
-            orderId: order.id,
-            orderName,
-            amount: order.totalAmount,
-            successUrl: `/payment/success?returnTo=/order/${tableId}`,
-            failUrl: `/payment/fail?returnTo=/order/${tableId}`,
-          });
-        },
+    startPayment({
+      items: state.items.map((item) => ({
+        menuId: item.menu.id,
+        quantity: item.quantity,
+        name: item.menu.name,
+      })),
+      amount: state.totalAmount,
+      idempotencyKey,
+      orderName,
+      successUrl: `/payment/success?returnTo=/order/${tableId}`,
+      failUrl: `/payment/fail?returnTo=/order/${tableId}`,
+      onOrderCreate: async () => {
+        const order = await createOrder.mutateAsync({
+          items: state.items.map((item) => ({
+            menu_id: item.menu.id,
+            quantity: item.quantity,
+          })),
+          idempotency_key: idempotencyKey,
+          order_mode: "DINE_IN",
+          source: "TABLE",
+          table_id: tableId,
+        });
+        return order;
       },
-    );
+    });
   };
 
   return (
     <Layout>
+      <OfflineBanner />
       <Header>
         <TableBadge>테이블 {tableId}</TableBadge>
         <Title>메뉴를 선택해주세요</Title>
@@ -220,9 +226,9 @@ export default function TableOrderShell({ tableId, initialMenus }: TableOrderShe
             size="lg"
             fullWidth
             onClick={handleOrder}
-            disabled={createOrder.isPending}
+            disabled={isProcessing}
           >
-            {createOrder.isPending ? "주문 중..." : "주문하기"}
+            {isProcessing ? "결제 진행 중..." : "주문하기"}
           </Button>
         </BottomBar>
       )}

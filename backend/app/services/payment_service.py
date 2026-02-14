@@ -22,18 +22,18 @@ class PaymentService:
         # 1. 주문 조회 + 금액 검증
         order = await self.db.order.find_unique(where={"id": order_id})
         if not order:
-            raise HTTPException(404, "Order not found")
+            raise HTTPException(404, "주문을 찾을 수 없습니다")
 
         if order.totalAmount != amount:
             raise HTTPException(
                 400,
-                f"Amount mismatch: order={order.totalAmount}, request={amount}"
+                f"결제 금액이 일치하지 않습니다: 주문={order.totalAmount}, 요청={amount}"
             )
 
         if order.status not in ["PENDING", "PAYMENT_PENDING"]:
             raise HTTPException(
                 400,
-                f"Order is not in payable status: {order.status}"
+                f"결제 가능한 상태가 아닙니다: {order.status}"
             )
 
         # 2. Payment 레코드 생성 또는 업데이트
@@ -112,7 +112,7 @@ class PaymentService:
 
             raise HTTPException(
                 status_code=e.response.status_code,
-                detail=f"Payment failed: {fail_reason}",
+                detail=f"결제 실패: {fail_reason}",
             )
 
     async def get_payment_by_order(self, order_id: str):
@@ -121,7 +121,7 @@ class PaymentService:
             where={"orderId": order_id}
         )
         if not payment:
-            raise HTTPException(404, "Payment not found for this order")
+            raise HTTPException(404, "이 주문의 결제 정보를 찾을 수 없습니다")
         return payment
 
     async def cancel(self, order_id: str, reason: str = "고객 요청 취소"):
@@ -136,16 +136,16 @@ class PaymentService:
             where={"orderId": order_id}
         )
         if not payment:
-            raise HTTPException(404, "Payment not found for this order")
+            raise HTTPException(404, "이 주문의 결제 정보를 찾을 수 없습니다")
 
         if payment.status != "DONE":
             raise HTTPException(
                 400,
-                f"Cannot cancel payment in {payment.status} status"
+                f"{payment.status} 상태의 결제는 취소할 수 없습니다"
             )
 
         if not payment.paymentKey:
-            raise HTTPException(400, "No payment key — cannot cancel via Toss")
+            raise HTTPException(400, "결제 키가 없어 취소할 수 없습니다")
 
         try:
             toss_response = await toss_client.cancel_payment(
@@ -172,5 +172,5 @@ class PaymentService:
             error_body = e.response.json() if e.response.content else {}
             raise HTTPException(
                 status_code=e.response.status_code,
-                detail=f"Cancel failed: {error_body.get('message', str(e))}",
+                detail=f"취소 실패: {error_body.get('message', str(e))}",
             )

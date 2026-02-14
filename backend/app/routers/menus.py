@@ -45,7 +45,7 @@ async def update_menu(menu_id: str, body: MenuUpdate):
     db = get_db()
     menu = await db.menu.find_unique(where={"id": menu_id})
     if not menu:
-        raise HTTPException(404, "Menu not found")
+        raise HTTPException(404, "메뉴를 찾을 수 없습니다")
     updated = await db.menu.update(
         where={"id": menu_id},
         data=body.model_dump(exclude_none=True),
@@ -58,7 +58,7 @@ async def delete_menu(menu_id: str):
     db = get_db()
     menu = await db.menu.find_unique(where={"id": menu_id})
     if not menu:
-        raise HTTPException(404, "Menu not found")
+        raise HTTPException(404, "메뉴를 찾을 수 없습니다")
     updated = await db.menu.update(
         where={"id": menu_id},
         data={"isAvailable": False},

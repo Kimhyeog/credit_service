@@ -9,7 +9,9 @@ export interface OrderItemCreate {
 export interface OrderCreateRequest {
   items: OrderItemCreate[];
   idempotency_key: string;
-  order_mode?: OrderMode; // 매장/포장 (기본값: DINE_IN)
+  order_mode?: OrderMode;
+  source?: "POS" | "KIOSK" | "TABLE";
+  table_id?: string;
 }
 
 export interface OrderItemResponse {
@@ -31,6 +33,9 @@ export interface OrderResponse {
   status: string;
   totalAmount: number;
   idempotencyKey: string;
+  source: string;
+  orderMode: string;
+  tableId: string | null;
   items: OrderItemResponse[];
   payment: PaymentResponse | null;
   createdAt: string;
