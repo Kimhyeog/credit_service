@@ -42,9 +42,17 @@ const TopBar = styled.header`
 `;
 
 const Logo = styled.h1`
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: ${({ theme }) => theme.fontSize.xl};
   font-weight: 700;
   color: ${({ theme }) => theme.colors.primary};
+`;
+
+const LogoIcon = styled.img`
+  width: 28px;
+  height: 28px;
 `;
 
 const TopBarActions = styled.div`
@@ -88,7 +96,10 @@ export default function POSClientShell({ initialMenus }: POSClientShellProps) {
             />
           )}
         <TopBar>
-          <Logo>Toss-Sync POS</Logo>
+          <Logo>
+            <LogoIcon src="/Toss_App_Icon.svg" alt="Toss" />
+            Toss-Sync POS
+          </Logo>
           <TopBarActions>
             <NavLink href="/kiosk">키오스크</NavLink>
             <NavLink href="/admin/orders">KDS</NavLink>
